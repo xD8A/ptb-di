@@ -11,11 +11,12 @@ def main() -> None:
     container = make_async_container(MyProvider())
 
     token = getenv("BOT_TOKEN")
-    application = Application.builder().token(token).build()
-    application.add_handler(CommandHandler("start", start))
 
-    setup_dishka(container, application)
+    app_builder = Application.builder().token(token)
+    setup_dishka(container, app_builder)
 
+    application = app_builder.build()
+    application.add_handler(CommandHandler("start", start, block=False))
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 

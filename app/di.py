@@ -2,7 +2,7 @@ from typing import Any, Awaitable, Callable, ParamSpec, TypeVar
 from contextvars import ContextVar
 from dishka import AsyncContainer, Container, Scope
 from dishka.integrations.base import wrap_injection
-from telegram.ext import Application, CallbackContext, SimpleUpdateProcessor
+from telegram.ext import ApplicationBuilder, CallbackContext, SimpleUpdateProcessor
 
 
 CONTAINER_NAME = "dishka_container"
@@ -13,7 +13,7 @@ P = ParamSpec("P")
 
 
 def _get_container_from_context(context: CallbackContext) -> AsyncContainer:
-    update_processor: ContainerUpdateProcessor = context._application._update_processor
+    update_processor: ContainerUpdateProcessor = context._application._update_processor  # pylint: disable=protected-access
     return update_processor.update_container.get()
 
 
@@ -43,6 +43,16 @@ class ContainerUpdateProcessor(SimpleUpdateProcessor):
             await super().do_process_update(update, coroutine)
             self.update_container.reset(token)
 
+def setup_dishka(container: Container, app_builder: ApplicationBuilder):
+    update_processor = app_builder._update_processor  # pylint: disable=protected-access
+    assert type(update_processor) is SimpleUpdateProcessor, (
+        "Inherit your custom UpdateProcessor from ContainerUpdateProcessor"
+        "instead of calling setup_dishka function"
+    )
 
-def setup_dishka(container: Container, app: Application):
-    app._update_processor = ContainerUpdateProcessor(container, max_concurrent_updates=1)
+    max_concurrent_updates = update_processor.max_concurrent_updates
+    new_update_processor = ContainerUpdateProcessor(
+        container,
+        max_concurrent_updates=max_concurrent_updates
+    )
+    app_builder.concurrent_updates(new_update_processor)
